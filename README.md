@@ -91,7 +91,222 @@ Like a **mailman** who collects reports from all your devices and delivers them 
 * **Open-source** and works well with Kubernetes, Docker, etc.
 * Scalable for both small and big systems
 
+
+
+
+
+
+
+## 🎯 Goal:
+
+Deploy **Grafana LGTM stack** (Loki, Grafana, Tempo, Mimir) on Minikube and a **sample app**, and view everything (logs, metrics, traces) via Grafana.
+
 ---
 
-If you want, I can also give you a **diagram or demo setup steps** next. Would that help?
+## 🧰 What You Need Installed
+
+Please make sure you have these:
+
+| Tool         | Description                        | Download Link                                                                        |
+| ------------ | ---------------------------------- | ------------------------------------------------------------------------------------ |
+| **Minikube** | Runs Kubernetes locally            | [https://minikube.sigs.k8s.io/docs/start/](https://minikube.sigs.k8s.io/docs/start/) |
+| **kubectl**  | Command tool to talk to Kubernetes | [https://kubernetes.io/docs/tasks/tools/](https://kubernetes.io/docs/tasks/tools/)   |
+| **Helm**     | Tool to install apps in Kubernetes | [https://helm.sh/docs/intro/install/](https://helm.sh/docs/intro/install/)           |
+
+If not sure, type:
+
+```bash
+minikube version
+kubectl version --client
+helm version
+```
+
+---
+
+## 🛠️ Step-by-Step Instructions
+
+### ✅ Step 1: Start Minikube
+
+```bash
+minikube start --cpus=4 --memory=8192
+```
+
+---
+
+### ✅ Step 2: Create Namespace
+
+```bash
+kubectl create namespace monitoring
+```
+
+---
+
+### ✅ Step 3: Add Helm Repositories
+
+```bash
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+```
+
+---
+
+### ✅ Step 4: Install Loki (for logs)
+
+```bash
+helm install loki grafana/loki-stack \
+  --namespace monitoring \
+  --set promtail.enabled=true
+```
+
+---
+
+### ✅ Step 5: Install Tempo (for tracing)
+
+```bash
+helm install tempo grafana/tempo-distributed \
+  --namespace monitoring
+```
+
+---
+
+### ✅ Step 6: Install Mimir (for metrics)
+
+```bash
+helm install mimir grafana/mimir-distributed \
+  --namespace monitoring
+```
+
+---
+
+### ✅ Step 7: Install Grafana (Dashboard UI)
+
+```bash
+helm install grafana grafana/grafana \
+  --namespace monitoring \
+  --set adminPassword='admin' \
+  --set service.type=NodePort
+```
+
+---
+
+## 🌐 How to Access Grafana
+
+Run this command to get the **Grafana dashboard URL**:
+
+```bash
+minikube service grafana --namespace monitoring --url
+```
+
+➡️ It will show something like:
+
+```
+http://127.0.0.1:32846
+```
+
+Open that URL in your browser.
+
+**Login:**
+
+* Username: `admin`
+* Password: `admin`
+
+✅ You are now in Grafana!
+
+---
+
+## 🧪 Step 8: Deploy a Sample App
+
+This app:
+
+* Logs output (for Loki)
+* Has metrics (for Mimir)
+* Sends traces (for Tempo)
+
+Run:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/BenedictNS/k8s-observability-demo/main/k8s-manifests/deployment.yaml
+```
+
+---
+
+## 🔌 Step 9: Connect Data Sources in Grafana
+
+In Grafana:
+
+1. Click **Settings → Data Sources**
+2. Click **Add data source** and add:
+
+| Name      | Type       | URL                                                                        |
+| --------- | ---------- | -------------------------------------------------------------------------- |
+| **Loki**  | Loki       | `http://loki.monitoring.svc.cluster.local:3100`                            |
+| **Tempo** | Tempo      | `http://tempo-query-frontend.monitoring.svc.cluster.local:3100`            |
+| **Mimir** | Prometheus | `http://mimir-query-frontend.monitoring.svc.cluster.local:8080/prometheus` |
+
+Click **Save & Test** for each.
+
+---
+
+## 🔍 Step 10: View Logs, Metrics, and Traces
+
+### 📜 View Logs:
+
+1. Go to **Explore** (from the left menu)
+2. Select **Loki** from top dropdown
+3. Run query:
+
+   ```
+   {app="otel-demo-app"}
+   ```
+4. You’ll see logs from your app.
+
+---
+
+### 📊 View Metrics:
+
+1. Go to **Explore**
+2. Select **Mimir (Prometheus)** from the dropdown
+3. Type:
+
+   ```
+   http_requests_total
+   ```
+4. You’ll see HTTP request graphs.
+
+---
+
+### 🚀 View Traces:
+
+1. Go to **Explore**
+2. Select **Tempo**
+3. You’ll see traces (filter by service name `otel-demo-app`)
+
+---
+
+## 🔁 Step 11: Test It
+
+Send a request to generate logs, metrics, and traces:
+
+```bash
+POD=$(kubectl get pods -l app=otel-demo-app -o jsonpath="{.items[0].metadata.name}")
+kubectl exec -it $POD -- curl http://localhost:8080
+```
+
+Now:
+
+* Go to **Explore → Loki** to see the new log line
+* Go to **Explore → Mimir** to see metrics
+* Go to **Explore → Tempo** to see a trace
+
+---
+
+## 🏁 Done!
+
+You’ve now deployed:
+
+* ✅ Loki → logs
+* ✅ Mimir → metrics
+* ✅ Tempo → traces
+* ✅ Grafana → dashboards
+* ✅ A sample app to generate all of the above
 
